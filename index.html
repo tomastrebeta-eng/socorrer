@@ -311,6 +311,13 @@
   .sync-dot.offline { background: #dc2626; box-shadow: 0 0 6px rgba(220,38,38,.7); animation: none; }
   .sync-label { font-size: .72rem; color: var(--muted, #6b7280); margin: 0 4px 0 6px; font-variant-numeric: tabular-nums; white-space: nowrap; }
   @keyframes syncPulse { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+  .wa-btn { display: inline-flex; align-items: center; gap: 5px; background: #25D366; color: #fff; border-radius: 999px; padding: 4px 11px; font-size: 11.5px; font-weight: 600; text-decoration: none; line-height: 1; vertical-align: middle; transition: background .15s, transform .1s; white-space: nowrap; }
+  .wa-btn:hover { background: #1ebe5b; }
+  .wa-btn:active { transform: scale(.96); }
+  .wa-btn svg { width: 13px; height: 13px; fill: #fff; flex: none; }
+  .wa-btn.wa-inline { padding: 3px; border-radius: 50%; }
+  .contacto-cell { display: inline-flex; align-items: center; gap: 8px; }
+  .tel-line { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 </style>
 </head>
 <body>
@@ -635,7 +642,7 @@ import { getFirestore, collection, onSnapshot, addDoc, updateDoc as fbUpdateDoc,
           '<td><span class="badge ' + info.cls + '">' + info.label + '</span></td>' +
           '<td>' + (g.cantidadPersonas||"—") + '</td>' +
           '<td>' + (prox ? vencimientoBadge(prox) : '<span class="badge badge-grey">Sin cursos</span>') + '</td>' +
-          '<td>' + escapeHtml(g.contacto||"—") + '</td></tr>';
+          '<td><div class="contacto-cell">' + escapeHtml(g.contacto||"—") + waButton(g.telefono, {iconOnly:true, cls:"wa-inline"}) + '</div></td></tr>';
       });
       html += '</tbody></table></div>';
     }
@@ -717,7 +724,7 @@ import { getFirestore, collection, onSnapshot, addDoc, updateDoc as fbUpdateDoc,
 
     html += '<div class="info-grid">';
     html += infoItem("Contacto", g.contacto || "—");
-    html += infoItem("Teléfono", g.telefono || "—");
+    html += '<div class="info-item"><div class="k">Teléfono</div><div class="v"><span class="tel-line">' + escapeHtml(g.telefono || "—") + waButton(g.telefono, {label:"WhatsApp", cls:"wa-detail"}) + '</span></div></div>';
     html += infoItem("Email", g.email || "—");
     html += infoItem("Cantidad de personas", g.cantidadPersonas || "—");
     html += '</div>';
@@ -790,6 +797,35 @@ import { getFirestore, collection, onSnapshot, addDoc, updateDoc as fbUpdateDoc,
   }
 
   function infoItem(k, v){ return '<div class="info-item"><div class="k">' + k + '</div><div class="v">' + escapeHtml(v) + '</div></div>'; }
+
+  /* ============ WhatsApp ============ */
+  // Normaliza un teléfono a formato wa.me. Por defecto asume celular argentino
+  // sin código de país: antepone 54 9 y quita el 15 de celular si viene cargado.
+  function waDigits(raw){
+    if (!raw) return "";
+    let d = String(raw).replace(/\D/g, "");
+    if (!d) return "";
+    d = d.replace(/^00/, "");                       // prefijo internacional 00
+    if (d.startsWith("54")) {                        // ya trae código de país
+      let rest = d.slice(2).replace(/^0/, "");
+      if (!rest.startsWith("9")) rest = "9" + rest.replace(/^(\d{2,4})15(\d{6,8})$/, "$1$2");
+      d = "54" + rest;
+    } else {
+      d = d.replace(/^0/, "");                        // quita 0 de larga distancia
+      d = d.replace(/^(\d{2,4})15(\d{6,8})$/, "$1$2"); // quita 15 de celular tras el área
+      d = "549" + d;
+    }
+    return d.length >= 10 ? d : "";
+  }
+  const WA_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38c1.45.79 3.08 1.21 4.79 1.21h.01c5.46 0 9.91-4.45 9.91-9.91C21.95 6.45 17.5 2 12.04 2zm0 18.15h-.01c-1.52 0-3.01-.41-4.3-1.18l-.31-.18-3.12.82.83-3.04-.2-.31a8.2 8.2 0 01-1.26-4.35c0-4.54 3.7-8.24 8.24-8.24 2.2 0 4.27.86 5.82 2.42a8.18 8.18 0 012.41 5.82c0 4.54-3.69 8.24-8.24 8.24zm4.52-6.16c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.12-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.12-1.05-.39-1.99-1.23-.74-.66-1.23-1.47-1.38-1.72-.14-.25-.02-.38.11-.51.11-.11.25-.29.37-.43.12-.14.16-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.34-.76-1.84-.2-.48-.4-.41-.56-.42h-.48c-.17 0-.43.06-.66.31-.23.25-.86.85-.86 2.07 0 1.22.89 2.4 1.01 2.56.12.17 1.75 2.67 4.23 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.68-1.18.21-.58.21-1.07.14-1.18-.06-.11-.23-.17-.48-.29z"/></svg>';
+  function waButton(raw, opts){
+    const d = waDigits(raw);
+    if (!d) return "";
+    opts = opts || {};
+    const cls = "wa-btn" + (opts.cls ? " " + opts.cls : "");
+    const label = opts.iconOnly ? "" : '<span>' + (opts.label || "WhatsApp") + '</span>';
+    return '<a class="' + cls + '" href="https://wa.me/' + d + '" target="_blank" rel="noopener" data-wa title="Chatear por WhatsApp">' + WA_ICON + label + '</a>';
+  }
   function tabBtn(id, label){ return '<button class="tab-btn' + (state.detailTab===id?' active':'') + '" data-tab="' + id + '">' + label + '</button>'; }
 
   /* ============ Modales ============ */
@@ -955,6 +991,9 @@ import { getFirestore, collection, onSnapshot, addDoc, updateDoc as fbUpdateDoc,
 
   /* ============ Delegación de eventos ============ */
   document.addEventListener("click", async (e) => {
+    // El botón de WhatsApp es un enlace real: dejarlo abrir sin abrir el grupo.
+    if (e.target.closest("[data-wa]")) return;
+
     const nav = e.target.closest("[data-nav]");
     if (nav) { state.view = nav.dataset.nav; render(); return; }
 
