@@ -4,6 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>SOCORRER · CRM de cursos</title>
+<meta name="description" content="CRM de cursos de primeros auxilios, RCP y DEA: grupos, cursos, vencimientos y pagos.">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#17948F">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="SOCORRER">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -297,14 +306,24 @@
   .note-date { font-size: 11px; color: var(--ink-soft); margin-bottom: 3px; }
   .note-text { font-size: 13.5px; line-height: 1.5; white-space: pre-wrap; }
 
+  #menuToggle { display: none; }
+  .sidebar-backdrop { display: none; position: fixed; inset: 0; background: rgba(20,26,25,0.45); z-index: 39; }
+  .sidebar-backdrop.show { display: block; }
   @media (max-width: 820px) {
-    .sidebar { position: fixed; left: 0; top: 0; bottom: 0; z-index: 40; transform: translateX(-100%); transition: transform .2s; }
+    #menuToggle { display: inline-flex; align-items: center; justify-content: center; font-size: 18px; }
+    .sidebar { position: fixed; left: 0; top: 0; bottom: 0; z-index: 40; transform: translateX(-100%); transition: transform .2s; box-shadow: 0 0 40px rgba(0,0,0,.25); padding-top: calc(16px + env(safe-area-inset-top, 0px)); }
     .sidebar.open { transform: translateX(0); }
     .kpi-row { grid-template-columns: 1fr 1fr; }
     .info-grid { grid-template-columns: 1fr 1fr; }
     .field-row { grid-template-columns: 1fr; }
     .view-root { padding: 16px; }
-    .topbar { padding: 14px 16px; padding-top: calc(14px + env(safe-area-inset-top, 0px)); }
+    .topbar { padding: 14px 16px; padding-top: calc(14px + env(safe-area-inset-top, 0px)); gap: 10px; }
+  }
+  @media (max-width: 560px) {
+    .kpi-row { grid-template-columns: 1fr; }
+    .info-grid { grid-template-columns: 1fr; }
+    .filters-row { flex-wrap: wrap; }
+    .filters-row .search-box { max-width: none; }
   }
   .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #16a34a; display: inline-block; box-shadow: 0 0 6px rgba(22,163,74,.7); transition: all .3s; vertical-align: middle; flex: none; }
   .sync-dot.syncing { background: #d97706; box-shadow: 0 0 6px rgba(217,119,6,.7); animation: syncPulse .8s infinite; }
@@ -331,10 +350,11 @@
     <div class="nav-spacer"></div>
     <div class="sidebar-foot">CRM de cursos de primeros<br>auxilios, RCP y DEA</div>
   </aside>
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
   <div class="main">
     <div class="topbar">
-      <button class="btn btn-ghost btn-sm" id="menuToggle" style="display:none">☰</button>
+      <button class="btn btn-ghost btn-sm" id="menuToggle" aria-label="Abrir menú">☰</button>
       <div>
         <h1 id="topbarTitle">Panel</h1>
         <div class="sub" id="topbarSub">Resumen general</div>
@@ -995,7 +1015,7 @@ import { getFirestore, collection, onSnapshot, addDoc, updateDoc as fbUpdateDoc,
     if (e.target.closest("[data-wa]")) return;
 
     const nav = e.target.closest("[data-nav]");
-    if (nav) { state.view = nav.dataset.nav; render(); return; }
+    if (nav) { state.view = nav.dataset.nav; closeDrawer(); render(); return; }
 
     const navTo = e.target.closest("[data-nav-to]");
     if (navTo) { state.view = navTo.dataset.navTo; render(); return; }
@@ -1039,6 +1059,30 @@ import { getFirestore, collection, onSnapshot, addDoc, updateDoc as fbUpdateDoc,
       return;
     }
   });
+
+  /* ============ Menú lateral en móvil ============ */
+  function openDrawer(){
+    document.getElementById("sidebar").classList.add("open");
+    document.getElementById("sidebarBackdrop").classList.add("show");
+  }
+  function closeDrawer(){
+    const sb = document.getElementById("sidebar");
+    const bd = document.getElementById("sidebarBackdrop");
+    if (sb) sb.classList.remove("open");
+    if (bd) bd.classList.remove("show");
+  }
+  document.getElementById("menuToggle").addEventListener("click", () => {
+    const open = document.getElementById("sidebar").classList.contains("open");
+    open ? closeDrawer() : openDrawer();
+  });
+  document.getElementById("sidebarBackdrop").addEventListener("click", closeDrawer);
+
+  /* ============ PWA: service worker (instalable + offline básico) ============ */
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch((err) => console.warn("SW no registrado:", err));
+    });
+  }
 
   /* ============ Init ============ */
   render();
