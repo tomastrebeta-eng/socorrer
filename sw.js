@@ -1,6 +1,6 @@
 /* Service worker de SOCORRER — cachea el app-shell para instalación PWA y uso offline básico.
    Los datos siguen viniendo en vivo de Firestore (peticiones cross-origin no se interceptan). */
-const CACHE = "socorrer-v1";
+const CACHE = "socorrer-v2";
 const SHELL = [
   "./",
   "./index.html",

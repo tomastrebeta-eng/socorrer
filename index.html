@@ -337,6 +337,26 @@
   .wa-btn.wa-inline { padding: 3px; border-radius: 50%; }
   .contacto-cell { display: inline-flex; align-items: center; gap: 8px; }
   .tel-line { display: inline-flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .modal.wide { max-width: 680px; }
+  .ins-sub { font-size: 12.5px; color: var(--ink-soft); margin-bottom: 10px; }
+  .ins-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .ins-drop { border: 1.5px dashed var(--border); border-radius: 10px; padding: 12px; font-size: 12px; color: var(--ink-soft); text-align: center; cursor: pointer; transition: .15s; margin-bottom: 8px; }
+  .ins-drop.drag { border-color: var(--brand); background: var(--brand-soft); color: var(--brand-dark); }
+  .ins-summary { font-size: 12.5px; color: var(--ink-soft); margin: 2px 0 8px; }
+  .ins-list { max-height: 46vh; overflow: auto; border: 1px solid var(--border); border-radius: 10px; }
+  .ins-head, .ins-row { display: grid; grid-template-columns: 1.2fr 1.2fr 100px 46px 30px; gap: 6px; align-items: center; padding: 6px 8px; }
+  .ins-head { position: sticky; top: 0; background: var(--surface-2); font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-soft); font-weight: 600; z-index: 1; }
+  .ins-row { border-top: 1px solid var(--border); }
+  .ins-row input[type=text] { width: 100%; padding: 5px 7px; font-size: 12.5px; }
+  .ins-head .pres, .ins-row .pres { display: flex; justify-content: center; }
+  .ins-del { background: none; border: none; color: var(--red); cursor: pointer; font-size: 14px; padding: 2px; }
+  .app-toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%) translateY(20px); background: var(--ink); color: #fff; padding: 10px 16px; border-radius: 10px; font-size: 13px; font-weight: 500; box-shadow: var(--shadow); z-index: 100; opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s; max-width: calc(100vw - 32px); text-align: center; }
+  .app-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .app-toast.error { background: var(--red); }
+  @media (max-width: 560px) {
+    .ins-head, .ins-row { grid-template-columns: 1fr 1fr 78px 40px 26px; gap: 4px; padding: 6px; }
+    .ins-tools .btn { flex: 1 1 auto; }
+  }
 </style>
 </head>
 <body>
@@ -746,6 +766,7 @@ import { getFirestore, collection, onSnapshot, addDoc, updateDoc as fbUpdateDoc,
     html += infoItem("Contacto", g.contacto || "—");
     html += '<div class="info-item"><div class="k">Teléfono</div><div class="v"><span class="tel-line">' + escapeHtml(g.telefono || "—") + waButton(g.telefono, {label:"WhatsApp", cls:"wa-detail"}) + '</span></div></div>';
     html += infoItem("Email", g.email || "—");
+    html += infoItem("CUIT / CUIL", g.cuit || "—");
     html += infoItem("Cantidad de personas", g.cantidadPersonas || "—");
     html += '</div>';
     if (g.notasGenerales) html += '<div style="margin-top:14px;font-size:13px;color:var(--ink-soft)">' + escapeHtml(g.notasGenerales) + '</div>';
@@ -766,7 +787,8 @@ import { getFirestore, collection, onSnapshot, addDoc, updateDoc as fbUpdateDoc,
         cursosG.forEach(c => {
           html += '<div class="list-row" data-curso-id="' + c.id + '" style="cursor:default">';
           html += '<div class="row-main"><div class="row-title">' + escapeHtml(c.tipoCurso) + '</div>';
-          html += '<div class="row-sub">' + fmtDate(c.fecha) + ' · ' + (c.asistentes||0) + ' asistentes' + (c.instructor ? " · " + escapeHtml(c.instructor) : "") + '</div></div>';
+          html += '<div class="row-sub">' + fmtDate(c.fecha) + ' · ' + attendeeSummary(c) + (c.instructor ? " · " + escapeHtml(c.instructor) : "") + '</div></div>';
+          html += '<button class="btn btn-sm" data-action="asistencia" data-id="' + c.id + '">👥 Asistencia</button>';
           if (c.estado === "programado") html += '<button class="btn btn-sm" data-action="marcar-realizado" data-id="' + c.id + '">Marcar realizado</button>';
           html += vencimientoBadge(c);
           html += '</div>';
@@ -851,8 +873,8 @@ import { getFirestore, collection, onSnapshot, addDoc, updateDoc as fbUpdateDoc,
   /* ============ Modales ============ */
   function closeModal(){ document.getElementById("modalRoot").innerHTML = ""; }
 
-  function openModal(html){
-    document.getElementById("modalRoot").innerHTML = '<div class="modal-overlay" id="modalOverlay"><div class="modal">' + html + '</div></div>';
+  function openModal(html, extraClass){
+    document.getElementById("modalRoot").innerHTML = '<div class="modal-overlay" id="modalOverlay"><div class="modal ' + (extraClass||"") + '">' + html + '</div></div>';
     document.getElementById("modalOverlay").addEventListener("click", e => { if (e.target.id === "modalOverlay") closeModal(); });
   }
 
@@ -874,6 +896,7 @@ import { getFirestore, collection, onSnapshot, addDoc, updateDoc as fbUpdateDoc,
           field("Teléfono", '<input type="text" id="f-telefono" value="' + escapeHtml(g.telefono||"") + '">') +
           field("Email", '<input type="text" id="f-email" value="' + escapeHtml(g.email||"") + '">') +
         '</div>' +
+        field("CUIT / CUIL (para facturación)", '<input type="text" id="f-cuit" value="' + escapeHtml(g.cuit||"") + '" placeholder="Ej: 30-12345678-9" inputmode="numeric">') +
         field("Notas generales", '<textarea id="f-notasgen">' + escapeHtml(g.notasGenerales||"") + '</textarea>') +
         '<div class="modal-actions"><button class="btn" data-close>Cancelar</button><button class="btn btn-primary" id="saveGrupo">Guardar</button></div>' +
       '</div>'
@@ -890,6 +913,7 @@ import { getFirestore, collection, onSnapshot, addDoc, updateDoc as fbUpdateDoc,
         cantidadPersonas: Number(document.getElementById("f-cantidad").value) || null,
         telefono: document.getElementById("f-telefono").value.trim(),
         email: document.getElementById("f-email").value.trim(),
+        cuit: document.getElementById("f-cuit").value.trim(),
         notasGenerales: document.getElementById("f-notasgen").value.trim(),
       };
       if (existing) {
@@ -964,6 +988,209 @@ import { getFirestore, collection, onSnapshot, addDoc, updateDoc as fbUpdateDoc,
     });
   }
 
+  /* ============ Inscriptos / Asistencia ============ */
+  function inscriptosDe(c){ return Array.isArray(c.inscriptos) ? c.inscriptos : []; }
+  function presentesDe(c){ return inscriptosDe(c).filter(p => p.presente).length; }
+  function attendeeSummary(c){
+    const ins = inscriptosDe(c);
+    if (ins.length) return presentesDe(c) + "/" + ins.length + " presentes";
+    return (c.asistentes || 0) + " asistentes";
+  }
+  function cleanInscripto(p){
+    return { id: p.id || genId(), apellido: (p.apellido||"").trim(), nombre: (p.nombre||"").trim(), dni: (p.dni||"").trim(), presente: !!p.presente };
+  }
+  function slug(s){ return String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").replace(/[^A-Za-z0-9]+/g,"-").replace(/^-+|-+$/g,"").slice(0,40) || "sin-nombre"; }
+
+  // Carga SheetJS solo cuando hace falta (import/export). Vendorizado local para que ande offline.
+  let _xlsxPromise = null;
+  function ensureXLSX(){
+    if (window.XLSX) return Promise.resolve(window.XLSX);
+    if (_xlsxPromise) return _xlsxPromise;
+    _xlsxPromise = new Promise((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = "xlsx.full.min.js";
+      s.onload = () => resolve(window.XLSX);
+      s.onerror = () => { _xlsxPromise = null; reject(new Error("No se pudo cargar la librería de Excel")); };
+      document.head.appendChild(s);
+    });
+    return _xlsxPromise;
+  }
+  function normTxt(s){ return String(s==null?"":s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").trim(); }
+
+  // Convierte filas (array de arrays) a inscriptos, detectando encabezados Apellido/Nombre/DNI.
+  function rowsToInscriptos(rows){
+    if (!rows || !rows.length) return [];
+    const header = rows[0].map(normTxt);
+    let iAp = -1, iNo = -1, iDni = -1, iFull = -1;
+    header.forEach((h, i) => {
+      const hasNom = h.includes("nombre"), hasAp = h.includes("apellid");
+      if (hasNom && hasAp && iFull < 0) iFull = i;
+      else if (hasAp && iAp < 0) iAp = i;
+      else if (hasNom && iNo < 0) iNo = i;
+      if ((h.includes("dni") || h.includes("documento")) && iDni < 0) iDni = i;
+    });
+    const hasHeader = iAp >= 0 || iNo >= 0 || iDni >= 0 || iFull >= 0;
+    const dataRows = hasHeader ? rows.slice(1) : rows;
+    if (!hasHeader) { iAp = 0; iNo = 1; iDni = 2; }
+    const out = [];
+    dataRows.forEach(r => {
+      if (!r || r.every(c => String(c).trim() === "")) return;
+      let apellido = "", nombre = "", dni = "";
+      if (iFull >= 0) {
+        const v = String(r[iFull] || "").trim();
+        if (v.includes(",")) { const p = v.split(","); apellido = p[0].trim(); nombre = p.slice(1).join(",").trim(); }
+        else { nombre = v; apellido = ""; }
+      } else {
+        apellido = iAp >= 0 ? String(r[iAp] || "").trim() : "";
+        nombre = iNo >= 0 ? String(r[iNo] || "").trim() : "";
+      }
+      dni = iDni >= 0 ? String(r[iDni] || "").replace(/[^\dkK]/g, "") : "";
+      if (!apellido && !nombre && !dni) return;
+      out.push({ id: genId(), apellido, nombre, dni, presente: false });
+    });
+    return out;
+  }
+
+  async function parseInscriptosFile(file){
+    const XLSX = await ensureXLSX();
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: "array" });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+    return rowsToInscriptos(rows);
+  }
+
+  function modalAsistencia(cursoId){
+    const curso = state.cursos.find(c => c.id === cursoId);
+    if (!curso) return;
+    const grupo = state.grupos.find(g => g.id === curso.grupoId);
+    let ins = inscriptosDe(curso).map(cleanInscripto);
+
+    openModal(
+      '<div class="modal-head"><h3>Asistencia — ' + escapeHtml(curso.tipoCurso) + '</h3><button class="modal-close" data-close>✕</button></div>' +
+      '<div class="modal-body">' +
+        '<div class="ins-sub">' + fmtDate(curso.fecha) + (grupo ? " · " + escapeHtml(grupo.nombre) : "") + '</div>' +
+        '<div class="ins-tools">' +
+          '<label class="btn btn-sm" style="cursor:pointer">📥 Importar xlsx/csv<input type="file" id="insFile" accept=".xlsx,.xls,.csv" hidden></label>' +
+          '<button class="btn btn-sm" id="insPlantilla" type="button">Descargar plantilla</button>' +
+          '<button class="btn btn-sm" id="insAdd" type="button">+ Agregar persona</button>' +
+          '<button class="btn btn-sm btn-green" id="insExport" type="button">⬇ Exportar presentes (Excel)</button>' +
+        '</div>' +
+        '<div class="ins-drop" id="insDrop">Arrastrá acá un archivo .xlsx o .csv (columnas: Apellido, Nombre, DNI)</div>' +
+        '<div class="ins-summary" id="insSummary"></div>' +
+        '<div class="ins-list" id="insList"></div>' +
+        '<div class="modal-actions"><button class="btn" data-close>Cerrar</button><button class="btn btn-primary" id="insSave">Guardar asistencia</button></div>' +
+      '</div>',
+      "wide"
+    );
+    wireCloseButtons();
+
+    const listEl = document.getElementById("insList");
+    const sumEl = document.getElementById("insSummary");
+
+    function readRows(){
+      const rows = listEl.querySelectorAll(".ins-row");
+      const next = [];
+      rows.forEach(row => {
+        next.push({
+          id: row.dataset.id,
+          apellido: row.querySelector(".ins-ap").value,
+          nombre: row.querySelector(".ins-no").value,
+          dni: row.querySelector(".ins-dni").value,
+          presente: row.querySelector(".ins-pres").checked,
+        });
+      });
+      ins = next.map(cleanInscripto);
+    }
+
+    function renderList(){
+      const total = ins.length;
+      const pres = ins.filter(p => p.presente).length;
+      sumEl.textContent = total ? (pres + " presentes de " + total + " inscriptos") : "Todavía no hay inscriptos. Importá un archivo o agregá personas.";
+      let h = '<div class="ins-head"><span>Apellido</span><span>Nombre</span><span>DNI</span><span class="pres"><input type="checkbox" id="insAll" title="Marcar todos"></span><span></span></div>';
+      ins.forEach(p => {
+        h += '<div class="ins-row" data-id="' + p.id + '">' +
+          '<input type="text" class="ins-ap" value="' + escapeHtml(p.apellido) + '" placeholder="Apellido">' +
+          '<input type="text" class="ins-no" value="' + escapeHtml(p.nombre) + '" placeholder="Nombre">' +
+          '<input type="text" class="ins-dni" value="' + escapeHtml(p.dni) + '" placeholder="DNI" inputmode="numeric">' +
+          '<span class="pres"><input type="checkbox" class="ins-pres"' + (p.presente ? " checked" : "") + '></span>' +
+          '<button type="button" class="ins-del" title="Quitar">✕</button>' +
+        '</div>';
+      });
+      listEl.innerHTML = h;
+      const all = document.getElementById("insAll");
+      if (all) { all.checked = total > 0 && pres === total; all.addEventListener("change", () => { readRows(); ins.forEach(p => p.presente = all.checked); renderList(); }); }
+      listEl.querySelectorAll(".ins-del").forEach(b => b.addEventListener("click", () => { readRows(); ins = ins.filter(x => x.id !== b.parentElement.dataset.id); renderList(); }));
+      listEl.querySelectorAll(".ins-pres").forEach(cb => cb.addEventListener("change", () => { readRows(); renderList(); }));
+    }
+    renderList();
+
+    document.getElementById("insAdd").addEventListener("click", () => {
+      readRows();
+      ins.push({ id: genId(), apellido: "", nombre: "", dni: "", presente: true });
+      renderList();
+      const rows = listEl.querySelectorAll(".ins-row");
+      const last = rows[rows.length - 1];
+      if (last) last.querySelector(".ins-ap").focus();
+    });
+
+    async function handleFile(file){
+      if (!file) return;
+      try {
+        const nuevos = await parseInscriptosFile(file);
+        if (!nuevos.length) { showToast("No se encontraron filas con datos en el archivo.", true); return; }
+        readRows();
+        ins = ins.concat(nuevos);
+        renderList();
+        showToast(nuevos.length + " persona(s) importada(s).");
+      } catch (e) {
+        console.error(e);
+        showToast("No se pudo leer el archivo. ¿Está en formato xlsx o csv?", true);
+      }
+    }
+    document.getElementById("insFile").addEventListener("change", e => { handleFile(e.target.files[0]); e.target.value = ""; });
+    const drop = document.getElementById("insDrop");
+    ["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("drag"); }));
+    ["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("drag"); }));
+    drop.addEventListener("drop", e => { if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]); });
+    drop.addEventListener("click", () => document.getElementById("insFile").click());
+
+    document.getElementById("insPlantilla").addEventListener("click", () => {
+      const csv = "Apellido,Nombre,DNI\n";
+      const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob); a.download = "plantilla_inscriptos.csv"; a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    });
+
+    document.getElementById("insExport").addEventListener("click", async () => {
+      readRows();
+      const presentes = ins.filter(p => p.presente);
+      if (!presentes.length) { showToast("No hay personas marcadas como presentes para exportar.", true); return; }
+      try {
+        const XLSX = await ensureXLSX();
+        const aoa = [["Apellido","Nombre","DNI","Curso","Fecha","Grupo"]];
+        presentes.forEach(p => aoa.push([p.apellido, p.nombre, p.dni, curso.tipoCurso, fmtDate(curso.fecha), grupo ? grupo.nombre : ""]));
+        const ws = XLSX.utils.aoa_to_sheet(aoa);
+        ws["!cols"] = [{ wch: 20 }, { wch: 20 }, { wch: 14 }, { wch: 22 }, { wch: 12 }, { wch: 24 }];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Presentes");
+        XLSX.writeFile(wb, "SOCORRER_" + slug(grupo ? grupo.nombre : "") + "_" + slug(curso.tipoCurso) + "_" + (curso.fecha || "") + "_presentes.xlsx");
+      } catch (e) {
+        console.error(e);
+        showToast("No se pudo generar el Excel.", true);
+      }
+    });
+
+    document.getElementById("insSave").addEventListener("click", async () => {
+      readRows();
+      const limpio = ins.map(cleanInscripto);
+      await updateDoc("cursos", cursoId, { inscriptos: limpio, asistentes: limpio.filter(p => p.presente).length });
+      closeModal();
+      render();
+    });
+  }
+
   function modalNewPago(grupoId){
     const cursosG = state.cursos.filter(c => c.grupoId === grupoId);
     openModal(
@@ -1005,6 +1232,16 @@ import { getFirestore, collection, onSnapshot, addDoc, updateDoc as fbUpdateDoc,
 
   function field(label, inputHtml){ return '<div class="field"><label>' + label + '</label>' + inputHtml + '</div>'; }
 
+  let _toastTimer = null;
+  function showToast(msg, isError){
+    let t = document.getElementById("appToast");
+    if (!t) { t = document.createElement("div"); t.id = "appToast"; document.body.appendChild(t); }
+    t.textContent = msg;
+    t.className = "app-toast show" + (isError ? " error" : "");
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => { t.className = "app-toast"; }, 3200);
+  }
+
   function wireCloseButtons(){
     document.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", closeModal));
   }
@@ -1033,6 +1270,7 @@ import { getFirestore, collection, onSnapshot, addDoc, updateDoc as fbUpdateDoc,
       if (act === "edit-grupo") modalNewGrupo(state.grupos.find(g => g.id === state.groupId));
       if (act === "new-curso") modalNewCurso(state.groupId);
       if (act === "new-pago") modalNewPago(state.groupId);
+      if (act === "asistencia") modalAsistencia(action.dataset.id);
       if (act === "marcar-realizado") {
         const c = state.cursos.find(x => x.id === action.dataset.id);
         if (c) {
